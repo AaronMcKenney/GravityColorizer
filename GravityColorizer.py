@@ -155,81 +155,158 @@ def InitializeGravityColorizer():
 	''').build()
 	
 	return (ctx, queue, prg)
+	
+def CreateValueArrayFromFunction(func_str, num_frames):
+	arr = []
+
+	#Use the provided function to evaluate the value for each time step (frame)
+	for t in range(num_frames):
+		arr.append(eval(dict['f']))
+	
+	return arr
+	
+def CreateValueArrayFromLinearInterpolation(dict, num_frames):
+	arr = []
+	
+	#Add the final keyframe's info the dict if it doesn't already exist
+	if num_frames - 1 not in dict:
+		last_keyfrm = sorted(dict.keys())[-1]
+		dict[num_frames - 1] = dict[last_keyfrm]
+	
+	#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
+	frm_idx_arr = list(range(num_frames))
+	keyfrm_idx_arr = sorted(dict.keys())
+	keyfrm_val_arr = [dict[k] for k in keyfrm_idx_arr]
+	arr = np.interp(frm_ids_arr, keyfrm_idx_arr, keyfrm_val_arr)
+
+	return arr
+
+def CreateValueArray(dict, num_frames):
+	arr = []
+	
+	if 'f' in dict:
+		#Use the provided function to evaluate the value for each time step (frame)
+		for t in range(num_frames):
+			arr.append(eval(dict['f']))
+	else:
+		#Add the final keyframe's info the dict if it doesn't already exist
+		if num_frames - 1 not in dict:
+			last_keyfrm = sorted(dict.keys())[-1]
+			dict[num_frames - 1] = dict[last_keyfrm]
+		
+		#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
+		frm_idx_arr = list(range(num_frames))
+		keyfrm_idx_arr = sorted(dict.keys())
+		keyfrm_val_arr = [dict[k] for k in keyfrm_idx_arr]
+		arr = np.interp(frm_ids_arr, keyfrm_idx_arr, keyfrm_val_arr)
+	
+	return arr
 
 def ProcessKeyFrames(keyfrm_dict, out_filename):
+	print('Setting up...')
+	
 	(ctx, queue, prg) = InitializeGravityColorizer()
 	img_arr = []
 	percent = 1
 	
-	#Initialize parameters to those of the first frame
-	#Note: It is expected that the first frame specified is frame 0
 	#Static across all frames
 	num_frames = np.uint32(keyfrm_dict['num_frames'])
 	frame_width = np.uint32(keyfrm_dict['frame_width'])
 	frame_height = np.uint32(keyfrm_dict['frame_height'])
 	num_pmos = np.uint32(len(keyfrm_dict['pmos'].keys()))
 	
-	#Add the final keyframe's info the dict if it doesn't already exist
-	if num_frames - 1 not in keyfrm_dict['n']:
-		last_keyfrm = sorted(keyfrm_dict['n'].keys())[-1]
-		keyfrm_dict['n'][num_frames - 1] = keyfrm_dict['n'][last_keyfrm]
-	if num_frames - 1 not in keyfrm_dict['dt']:
-		last_keyfrm = sorted(keyfrm_dict['dt'].keys())[-1]
-		keyfrm_dict['dt'][num_frames - 1] = keyfrm_dict['dt'][last_keyfrm]
-	for pmos_key in keyfrm_dict['pmos'].keys():
-		if num_frames - 1 not in keyfrm_dict['pmos'][pmos_key]:
-			last_keyfrm = sorted(keyfrm_dict['pmos'][pmos_key].keys())[-1]
-			keyfrm_dict['pmos'][pmos_key][num_frames - 1] = keyfrm_dict['pmos'][pmos_key][last_keyfrm]
+	n_arr = []
+	if 'f' in keyfrm_dict['n']:
+		for t in range(num_frames):
+			n_arr.append(eval(keyfrm_dict['n']['f']))
+	else:
+		#Add the final keyframe's info the dict if it doesn't already exist
+		if num_frames - 1 not in keyfrm_dict['n']:
+			last_keyfrm = sorted(keyfrm_dict['n'].keys())[-1]
+			keyfrm_dict['n'][num_frames - 1] = keyfrm_dict['n'][last_keyfrm]
+		
+		#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
+		frm_idx_arr = list(range(num_frames))
+		keyfrm_n_idx_arr = sorted(keyfrm_dict['n'].keys())
+		keyfrm_n_val_arr = [keyfrm_dict['n'][k] for k in keyfrm_n_idx_arr]
+		n_arr = np.interp(frm_idx_arr, keyfrm_n_idx_arr, keyfrm_n_val_arr)
 	
-	#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
-	frm_idx_arr = list(range(num_frames))
-	#n
-	keyfrm_n_idx_arr = sorted(keyfrm_dict['n'].keys())
-	keyfrm_n_val_arr = [keyfrm_dict['n'][k] for k in keyfrm_n_idx_arr]
-	n_arr = np.interp(frm_idx_arr, keyfrm_n_idx_arr, keyfrm_n_val_arr)
-	#dt
-	keyfrm_dt_idx_arr = sorted(keyfrm_dict['dt'].keys())
-	keyfrm_dt_val_arr = [keyfrm_dict['dt'][k] for k in keyfrm_dt_idx_arr]
-	dt_arr = np.interp(frm_idx_arr, keyfrm_dt_idx_arr, keyfrm_dt_val_arr)
-	#pmos
+	dt_arr = []
+	if 'f' in keyfrm_dict['dt']:
+		for t in range(num_frames):
+			dt_arr.append(eval(keyfrm_dict['dt']['f']))
+	else:
+		#Add the final keyframe's info the dict if it doesn't already exist
+		if num_frames - 1 not in keyfrm_dict['dt']:
+			last_keyfrm = sorted(keyfrm_dict['dt'].keys())[-1]
+			keyfrm_dict['dt'][num_frames - 1] = keyfrm_dict['dt'][last_keyfrm]
+		
+		#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
+		frm_idx_arr = list(range(num_frames))
+		keyfrm_dt_idx_arr = sorted(keyfrm_dict['dt'].keys())
+		keyfrm_dt_val_arr = [keyfrm_dict['dt'][k] for k in keyfrm_dt_idx_arr]
+		dt_arr = np.interp(frm_idx_arr, keyfrm_dt_idx_arr, keyfrm_dt_val_arr)
+	
 	pmos_c_arr_dict = {}
 	pmos_p_arr_dict = {}
 	pmos_m_arr_dict = {}
 	pmos_r_arr_dict = {}
 	for pmos_key in keyfrm_dict['pmos'].keys():
-		keyfrm_pmos_idx_arr = sorted(keyfrm_dict['pmos'][pmos_key].keys())
+		pmos_cr_arr = []
+		pmos_cg_arr = []
+		pmos_cb_arr = []
+		pmos_px_arr = []
+		pmos_py_arr = []
+		pmos_m_arr = []
+		pmos_r_arr = []
+		if 'f' in keyfrm_dict['pmos'][pmos_key]:
+			for t in range(num_frames):
+				pmos_cr_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['cr']))
+				pmos_cg_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['cg']))
+				pmos_cb_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['cb']))
+				pmos_px_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['px']))
+				pmos_py_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['py']))
+				pmos_m_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['m']))
+				pmos_r_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['r']))
+		else:
+			#Add the final keyframe's info the dict if it doesn't already exist
+			if num_frames - 1 not in keyfrm_dict['pmos'][pmos_key]:
+				last_keyfrm = sorted(keyfrm_dict['pmos'][pmos_key].keys())[-1]
+				keyfrm_dict['pmos'][pmos_key][num_frames - 1] = keyfrm_dict['pmos'][pmos_key][last_keyfrm]
+			
+			#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
+			frm_idx_arr = list(range(num_frames))
+			keyfrm_pmos_idx_arr = sorted(keyfrm_dict['pmos'][pmos_key].keys())
+			
+			#c - R
+			keyfrm_pmos_cr_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][R] for k in keyfrm_pmos_idx_arr]
+			pmos_cr_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cr_val_arr)
+			#c - G
+			keyfrm_pmos_cg_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][G] for k in keyfrm_pmos_idx_arr]
+			pmos_cg_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cg_val_arr)
+			#c - B
+			keyfrm_pmos_cb_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][B] for k in keyfrm_pmos_idx_arr]
+			pmos_cb_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cb_val_arr)
+			
+			#p - x
+			keyfrm_pmos_px_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['p'][X] for k in keyfrm_pmos_idx_arr]
+			pmos_px_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_px_val_arr)
+			#p - y
+			keyfrm_pmos_py_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['p'][Y] for k in keyfrm_pmos_idx_arr]
+			pmos_py_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_py_val_arr)
+			
+			#m
+			keyfrm_pmos_m_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['m'] for k in keyfrm_pmos_idx_arr]
+			pmos_m_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_m_val_arr)
+			
+			#r
+			keyfrm_pmos_r_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['r'] for k in keyfrm_pmos_idx_arr]
+			pmos_r_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_r_val_arr)
 		
-		#c - R
-		keyfrm_pmos_cr_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][R] for k in keyfrm_pmos_idx_arr]
-		pmos_cr_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cr_val_arr)
-		#c - G
-		keyfrm_pmos_cg_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][G] for k in keyfrm_pmos_idx_arr]
-		pmos_cg_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cg_val_arr)
-		#c - B
-		keyfrm_pmos_cb_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][B] for k in keyfrm_pmos_idx_arr]
-		pmos_cb_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cb_val_arr)
 		#Add to dict
 		pmos_c_arr_dict[pmos_key] = [pmos_cr_arr, pmos_cg_arr, pmos_cb_arr]
-		
-		#p - x
-		keyfrm_pmos_px_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['p'][X] for k in keyfrm_pmos_idx_arr]
-		pmos_px_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_px_val_arr)
-		#p - y
-		keyfrm_pmos_py_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['p'][Y] for k in keyfrm_pmos_idx_arr]
-		pmos_py_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_py_val_arr)
-		#Add to dict
 		pmos_p_arr_dict[pmos_key] = [pmos_px_arr, pmos_py_arr]
-		
-		#m
-		keyfrm_pmos_m_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['m'] for k in keyfrm_pmos_idx_arr]
-		pmos_m_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_m_val_arr)
-		#Add to dict
 		pmos_m_arr_dict[pmos_key] = pmos_m_arr
-		
-		#r
-		keyfrm_pmos_r_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['r'] for k in keyfrm_pmos_idx_arr]
-		pmos_r_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_r_val_arr)
-		#add to dict
 		pmos_r_arr_dict[pmos_key] = pmos_r_arr
 	
 	#PMOs Arrays Creation (Note: Assumes that the first frame has all of the pmos listed)
@@ -238,11 +315,12 @@ def ProcessKeyFrames(keyfrm_dict, out_filename):
 	pmos_m = np.zeros((1, num_pmos), dtype=np.float32)
 	pmos_r = np.zeros((1, num_pmos), dtype=np.float32)
 	
+	print('Setup Complete. Creating Visualization.')
 	for frm_idx in range(num_frames):
 		n = np.uint32(n_arr[frm_idx])
 		dt = np.uint32(dt_arr[frm_idx])
 		
-		for pmos_idx, pmos_key in enumerate(keyfrm_dict['pmos'].keys()):
+		for pmos_idx, pmos_key in enumerate(sorted(keyfrm_dict['pmos'].keys())):
 			pmos_c[0, pmos_idx] = (int(np.rint(pmos_c_arr_dict[pmos_key][R][frm_idx])), int(np.rint(pmos_c_arr_dict[pmos_key][G][frm_idx])), int(np.rint(pmos_c_arr_dict[pmos_key][B][frm_idx])), 255)
 			pmos_p[0, pmos_idx] = (pmos_p_arr_dict[pmos_key][X][frm_idx], pmos_p_arr_dict[pmos_key][Y][frm_idx])
 			pmos_m[0, pmos_idx] = (pmos_m_arr_dict[pmos_key][frm_idx])
