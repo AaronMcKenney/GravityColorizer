@@ -23,6 +23,9 @@ A = 3
 X = 0
 Y = 1
 
+def Interpolate(x0, x1, y0, y1, x):
+	return y0 + (x - x0)*(y1 - y0)/(x1 - x0)
+
 def ParseCommandLineArgs():
 	path_def = './GravityColorizer_keyframes.yaml'
 	out_def = 'result'
@@ -46,7 +49,7 @@ def ParseCommandLineArgs():
 	args = parser.parse_args()
 	
 	return args
-
+	
 def ParseKeyframeFile(keyframe_path):
 	num_frames = 0
 	frame_width = 0
@@ -56,7 +59,7 @@ def ParseKeyframeFile(keyframe_path):
 	
 	try:
 		with open(keyframe_path) as f:
-			yaml_obj = yaml.load(f)
+			yaml_obj = yaml.load(f, yaml.SafeLoader)
 	except Exception as err:
 		print('Failed to get info from path "' + keyframe_path + '". Error message: "' + str(err) + '"')
 		exit()
@@ -155,51 +158,39 @@ def InitializeGravityColorizer():
 	''').build()
 	
 	return (ctx, queue, prg)
-	
-def CreateValueArrayFromFunction(func_str, num_frames):
-	arr = []
 
-	#Use the provided function to evaluate the value for each time step (frame)
-	for t in range(num_frames):
-		arr.append(eval(dict['f']))
+def GetValueFromMethod(method, t):
+	value = 0
 	
-	return arr
-	
-def CreateValueArrayFromLinearInterpolation(dict, num_frames):
-	arr = []
-	
-	#Add the final keyframe's info the dict if it doesn't already exist
-	if num_frames - 1 not in dict:
-		last_keyfrm = sorted(dict.keys())[-1]
-		dict[num_frames - 1] = dict[last_keyfrm]
-	
-	#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
-	frm_idx_arr = list(range(num_frames))
-	keyfrm_idx_arr = sorted(dict.keys())
-	keyfrm_val_arr = [dict[k] for k in keyfrm_idx_arr]
-	arr = np.interp(frm_ids_arr, keyfrm_idx_arr, keyfrm_val_arr)
-
-	return arr
-
-def CreateValueArray(dict, num_frames):
-	arr = []
-	
-	if 'f' in dict:
-		#Use the provided function to evaluate the value for each time step (frame)
-		for t in range(num_frames):
-			arr.append(eval(dict['f']))
+	if type(method) == int or type(method) == float:
+		value = method
 	else:
-		#Add the final keyframe's info the dict if it doesn't already exist
-		if num_frames - 1 not in dict:
-			last_keyfrm = sorted(dict.keys())[-1]
-			dict[num_frames - 1] = dict[last_keyfrm]
-		
-		#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
-		frm_idx_arr = list(range(num_frames))
-		keyfrm_idx_arr = sorted(dict.keys())
-		keyfrm_val_arr = [dict[k] for k in keyfrm_idx_arr]
-		arr = np.interp(frm_ids_arr, keyfrm_idx_arr, keyfrm_val_arr)
+		#Assume it's a string and use shady and unsafe eval() function.
+		value = eval(method)
 	
+	return value
+
+def CreateArrayFromMaybeKeyFrames(maybe_keyfrm_dict, num_frames):
+	arr = []
+	
+	if type(maybe_keyfrm_dict) != dict:
+		#There are no keyframes. Value is either static or dynamic based off single function.
+		method = maybe_keyfrm_dict
+		for t in range(num_frames):
+			arr.append(GetValueFromMethod(method, t))
+	else:
+		keyfrm_dict = maybe_keyfrm_dict
+		keyfrm_idx = 0
+		keyfrm_key_arr = sorted(keyfrm_dict.keys())
+		for t in range(num_frames):
+			#Update the key frame index to match the current frame that we're looking at
+			if keyfrm_idx < len(keyfrm_dict) - 1 and keyfrm_key_arr[keyfrm_idx + 1] <= t:
+				keyfrm_idx += 1
+			
+			#Obtain the value per frame index from the keyfrm_dict.
+			#Assume it is a string and use the shady and unsafe eval() function.
+			arr.append(GetValueFromMethod(keyfrm_dict[keyfrm_key_arr[keyfrm_idx]], t))
+
 	return arr
 
 def ProcessKeyFrames(keyfrm_dict, out_filename):
@@ -211,97 +202,26 @@ def ProcessKeyFrames(keyfrm_dict, out_filename):
 	
 	#Static across all frames
 	num_frames = np.uint32(keyfrm_dict['num_frames'])
+	frm_idx_arr = list(range(num_frames))
 	frame_width = np.uint32(keyfrm_dict['frame_width'])
 	frame_height = np.uint32(keyfrm_dict['frame_height'])
 	num_pmos = np.uint32(len(keyfrm_dict['pmos'].keys()))
 	
-	n_arr = []
-	if 'f' in keyfrm_dict['n']:
-		for t in range(num_frames):
-			n_arr.append(eval(keyfrm_dict['n']['f']))
-	else:
-		#Add the final keyframe's info the dict if it doesn't already exist
-		if num_frames - 1 not in keyfrm_dict['n']:
-			last_keyfrm = sorted(keyfrm_dict['n'].keys())[-1]
-			keyfrm_dict['n'][num_frames - 1] = keyfrm_dict['n'][last_keyfrm]
-		
-		#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
-		frm_idx_arr = list(range(num_frames))
-		keyfrm_n_idx_arr = sorted(keyfrm_dict['n'].keys())
-		keyfrm_n_val_arr = [keyfrm_dict['n'][k] for k in keyfrm_n_idx_arr]
-		n_arr = np.interp(frm_idx_arr, keyfrm_n_idx_arr, keyfrm_n_val_arr)
-	
-	dt_arr = []
-	if 'f' in keyfrm_dict['dt']:
-		for t in range(num_frames):
-			dt_arr.append(eval(keyfrm_dict['dt']['f']))
-	else:
-		#Add the final keyframe's info the dict if it doesn't already exist
-		if num_frames - 1 not in keyfrm_dict['dt']:
-			last_keyfrm = sorted(keyfrm_dict['dt'].keys())[-1]
-			keyfrm_dict['dt'][num_frames - 1] = keyfrm_dict['dt'][last_keyfrm]
-		
-		#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
-		frm_idx_arr = list(range(num_frames))
-		keyfrm_dt_idx_arr = sorted(keyfrm_dict['dt'].keys())
-		keyfrm_dt_val_arr = [keyfrm_dict['dt'][k] for k in keyfrm_dt_idx_arr]
-		dt_arr = np.interp(frm_idx_arr, keyfrm_dt_idx_arr, keyfrm_dt_val_arr)
+	n_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['n'], num_frames)
+	dt_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['dt'], num_frames)
 	
 	pmos_c_arr_dict = {}
 	pmos_p_arr_dict = {}
 	pmos_m_arr_dict = {}
 	pmos_r_arr_dict = {}
 	for pmos_key in keyfrm_dict['pmos'].keys():
-		pmos_cr_arr = []
-		pmos_cg_arr = []
-		pmos_cb_arr = []
-		pmos_px_arr = []
-		pmos_py_arr = []
-		pmos_m_arr = []
-		pmos_r_arr = []
-		if 'f' in keyfrm_dict['pmos'][pmos_key]:
-			for t in range(num_frames):
-				pmos_cr_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['cr']))
-				pmos_cg_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['cg']))
-				pmos_cb_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['cb']))
-				pmos_px_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['px']))
-				pmos_py_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['py']))
-				pmos_m_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['m']))
-				pmos_r_arr.append(eval(keyfrm_dict['pmos'][pmos_key]['f']['r']))
-		else:
-			#Add the final keyframe's info the dict if it doesn't already exist
-			if num_frames - 1 not in keyfrm_dict['pmos'][pmos_key]:
-				last_keyfrm = sorted(keyfrm_dict['pmos'][pmos_key].keys())[-1]
-				keyfrm_dict['pmos'][pmos_key][num_frames - 1] = keyfrm_dict['pmos'][pmos_key][last_keyfrm]
-			
-			#Construct a frame array (x coords), and use linear interpolation to obtain parameter values for each frame (y coords)
-			frm_idx_arr = list(range(num_frames))
-			keyfrm_pmos_idx_arr = sorted(keyfrm_dict['pmos'][pmos_key].keys())
-			
-			#c - R
-			keyfrm_pmos_cr_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][R] for k in keyfrm_pmos_idx_arr]
-			pmos_cr_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cr_val_arr)
-			#c - G
-			keyfrm_pmos_cg_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][G] for k in keyfrm_pmos_idx_arr]
-			pmos_cg_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cg_val_arr)
-			#c - B
-			keyfrm_pmos_cb_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['c'][B] for k in keyfrm_pmos_idx_arr]
-			pmos_cb_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_cb_val_arr)
-			
-			#p - x
-			keyfrm_pmos_px_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['p'][X] for k in keyfrm_pmos_idx_arr]
-			pmos_px_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_px_val_arr)
-			#p - y
-			keyfrm_pmos_py_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['p'][Y] for k in keyfrm_pmos_idx_arr]
-			pmos_py_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_py_val_arr)
-			
-			#m
-			keyfrm_pmos_m_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['m'] for k in keyfrm_pmos_idx_arr]
-			pmos_m_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_m_val_arr)
-			
-			#r
-			keyfrm_pmos_r_val_arr = [keyfrm_dict['pmos'][pmos_key][k]['r'] for k in keyfrm_pmos_idx_arr]
-			pmos_r_arr = np.interp(frm_idx_arr, keyfrm_pmos_idx_arr, keyfrm_pmos_r_val_arr)
+		pmos_cr_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['cr'], num_frames)
+		pmos_cg_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['cg'], num_frames)
+		pmos_cb_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['cb'], num_frames)
+		pmos_px_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['px'], num_frames)
+		pmos_py_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['py'], num_frames)
+		pmos_m_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['m'], num_frames)
+		pmos_r_arr = CreateArrayFromMaybeKeyFrames(keyfrm_dict['pmos'][pmos_key]['r'], num_frames)
 		
 		#Add to dict
 		pmos_c_arr_dict[pmos_key] = [pmos_cr_arr, pmos_cg_arr, pmos_cb_arr]
@@ -362,6 +282,15 @@ def ProcessKeyFrames(keyfrm_dict, out_filename):
 	#duration=33 ==> ~30fps
 	#loop=0 ==> gif will repeat after finishing.
 	img_arr[0].save(out_filename + '.gif', format='GIF', loop=0, duration=33, save_all=True, append_images=img_arr[1:])
+	
+	#NOTE: Gif files only use 256 colors per frame, and this program will frequently exceed that even if the planet is only one color.
+	#  The result is a large file with extremely noticeable dithering or "rings" around each pmo.
+	#  The reason for this occurring is most likely due to the finely detailed gradients that this program creates for certain values of n and dt.
+	#  Dithering can be outright eliminated by using programs such as gifski on an array of png files, like so:
+	#Uncomment for png array:
+	##for i in range(len(img_arr)):
+	##	img_arr[i].save(out_filename + '_' + str(i) + '.png', format='PNG')
+	#NOTE: gifski is open source and uses the AGPL 3 license.
 
 def Main():
 	args = ParseCommandLineArgs()
