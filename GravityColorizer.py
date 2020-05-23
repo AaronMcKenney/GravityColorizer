@@ -202,7 +202,6 @@ def ProcessKeyFrames(keyfrm_dict, out_filename):
 	
 	#Static across all frames
 	num_frames = np.uint32(keyfrm_dict['num_frames'])
-	frm_idx_arr = list(range(num_frames))
 	frame_width = np.uint32(keyfrm_dict['frame_width'])
 	frame_height = np.uint32(keyfrm_dict['frame_height'])
 	num_pmos = np.uint32(len(keyfrm_dict['pmos'].keys()))
